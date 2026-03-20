@@ -1,0 +1,14 @@
+Benchmark Results - Sum of Squares
+Timestamp,2026-03-20T20:40:36.706820
+N,"10,000,000"
+Iterations,5
+
+Method,Avg Time (s),Min Time (s),Max Time (s)
+Python,0.460180,0.442537,0.500279
+Rust (PyO3),0.194887,0.194212,0.196080
+Go (cgo),0.010416,0.010384,0.010439
+
+Performance Comparison
+Python,0.460180,1.00x speedup
+Rust (PyO3),0.194887,2.36x speedup
+Go (cgo),0.010416,44.18x speedup
