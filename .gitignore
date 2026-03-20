@@ -55,3 +55,6 @@ htmlcov/
 *.so
 *.dylib
 *.h
+
+# GitHub Actions
+.github/workflows/*.log

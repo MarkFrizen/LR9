@@ -6,8 +6,35 @@ build-backend = "maturin"
 name = "pyo3-sum"
 version = "0.1.0"
 description = "Rust library for sum of squares calculation exposed to Python via PyO3"
+readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Libraries",
+]
+keywords = ["rust", "pyo3", "sum", "squares", "performance", "native"]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/your-repo/tree/main/benchmark/pyo3-sum"
+Repository = "https://github.com/yourusername/your-repo.git"
+Issues = "https://github.com/yourusername/your-repo/issues"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+include = ["LICENSE", "README.md"]
