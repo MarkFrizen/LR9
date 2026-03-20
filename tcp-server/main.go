@@ -7,13 +7,15 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync/atomic"
 	"time"
 )
 
 // Lr9TcpServer представляет TCP-сервер для обработки JSON-сообщений
 type Lr9TcpServer struct {
-	host string
-	port string
+	host              string
+	port              string
+	activeConnections int64
 }
 
 // Request представляет входящее сообщение от клиента
@@ -35,9 +37,17 @@ func NewLr9TcpServer(host, port string) *Lr9TcpServer {
 	}
 }
 
+// GetActiveConnections возвращает текущее количество активных подключений
+func (s *Lr9TcpServer) GetActiveConnections() int64 {
+	return atomic.LoadInt64(&s.activeConnections)
+}
+
 // handleConnection обрабатывает подключение клиента в отдельной горутине
 func (s *Lr9TcpServer) handleConnection(conn net.Conn) {
 	defer conn.Close()
+	defer atomic.AddInt64(&s.activeConnections, -1)
+
+	atomic.AddInt64(&s.activeConnections, 1)
 
 	reader := bufio.NewReader(conn)
 
@@ -90,6 +100,14 @@ func (s *Lr9TcpServer) Start() error {
 	defer listener.Close()
 
 	log.Printf("Lr9TcpServer запущен на %s", addr)
+
+	// Фоновая горутина для вывода статистики активных подключений
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+			log.Printf("Активных подключений: %d", atomic.LoadInt64(&s.activeConnections))
+		}
+	}()
 
 	for {
 		conn, err := listener.Accept()

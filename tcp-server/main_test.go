@@ -277,3 +277,114 @@ func TestResponseTimestampFormat(t *testing.T) {
 		t.Errorf("Timestamp не соответствует формату YYYY-MM-DD HH:MM:SS: %v", err)
 	}
 }
+
+// TestActiveConnectionsCounter тестирует счётчик активных подключений
+func TestActiveConnectionsCounter(t *testing.T) {
+	server := NewLr9TcpServer("localhost", "0")
+
+	listener, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatalf("Ошибка создания listener: %v", err)
+	}
+	defer listener.Close()
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go server.handleConnection(conn)
+		}
+	}()
+
+	// Начальное значение счётчика
+	if server.GetActiveConnections() != 0 {
+		t.Errorf("Ожидалось 0 активных подключений, получено %d", server.GetActiveConnections())
+	}
+
+	// Подключаем первого клиента
+	client1, err := net.Dial("tcp", listener.Addr().String())
+	if err != nil {
+		t.Fatalf("Ошибка подключения client1: %v", err)
+	}
+
+	// Даём время на инкремент счётчика
+	time.Sleep(50 * time.Millisecond)
+
+	if server.GetActiveConnections() != 1 {
+		t.Errorf("Ожидалось 1 активное подключение, получено %d", server.GetActiveConnections())
+	}
+
+	// Подключаем второго клиента
+	client2, err := net.Dial("tcp", listener.Addr().String())
+	if err != nil {
+		t.Fatalf("Ошибка подключения client2: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	if server.GetActiveConnections() != 2 {
+		t.Errorf("Ожидалось 2 активных подключения, получено %d", server.GetActiveConnections())
+	}
+
+	// Отключаем первого клиента
+	client1.Close()
+
+	time.Sleep(50 * time.Millisecond)
+
+	if server.GetActiveConnections() != 1 {
+		t.Errorf("Ожидалось 1 активное подключение после отключения client1, получено %d", server.GetActiveConnections())
+	}
+
+	// Отключаем второго клиента
+	client2.Close()
+
+	time.Sleep(50 * time.Millisecond)
+
+	if server.GetActiveConnections() != 0 {
+		t.Errorf("Ожидалось 0 активных подключений после отключения всех клиентов, получено %d", server.GetActiveConnections())
+	}
+}
+
+// TestServerStartLogsActiveConnections тестирует вывод логов о количестве подключений
+func TestServerStartLogsActiveConnections(t *testing.T) {
+	server := NewLr9TcpServer("localhost", "0")
+
+	listener, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatalf("Ошибка создания listener: %v", err)
+	}
+	defer listener.Close()
+
+	// Запускаем сервер в горутине (Start сам запускает горутину для логгирования)
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go server.handleConnection(conn)
+		}
+	}()
+
+	// Подключаем клиента
+	client, err := net.Dial("tcp", listener.Addr().String())
+	if err != nil {
+		t.Fatalf("Ошибка подключения: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	if server.GetActiveConnections() != 1 {
+		t.Errorf("Ожидалось 1 активное подключение, получено %d", server.GetActiveConnections())
+	}
+
+	client.Close()
+
+	time.Sleep(50 * time.Millisecond)
+
+	if server.GetActiveConnections() != 0 {
+		t.Errorf("Ожидалось 0 активных подключений после отключения, получено %d", server.GetActiveConnections())
+	}
+}
