@@ -30,7 +30,6 @@ wheels/
 
 # Maturin
 *.whl
-Cargo.lock
 
 # Virtual environments
 venv/
