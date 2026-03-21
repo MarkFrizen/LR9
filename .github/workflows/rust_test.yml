@@ -2,6 +2,7 @@
 name: Rust Test (pyo3-sum)
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, master, develop]
     paths:
