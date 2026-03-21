@@ -141,10 +141,9 @@ jobs:
           maturin develop --release
 
       - name: Run benchmark
-        working-directory: benchmark
         run: |
           source .venv/bin/activate
-          python benchmark.py -n 1000000 -i 5 --no-plot
+          python benchmark/benchmark.py -n 1000000 -i 5 --no-plot
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v5
