@@ -89,13 +89,19 @@ jobs:
       - name: Install maturin
         run: pip install maturin
 
-      - name: Build and install pyo3-sum
+      - name: Create virtualenv
+        run: python -m venv .venv
+
+      - name: Activate virtualenv and build pyo3-sum
         working-directory: benchmark/pyo3-sum
-        run: maturin develop --release
+        run: |
+          source ../../.venv/bin/activate
+          maturin develop --release
 
       - name: Run Python tests
         working-directory: benchmark/pyo3-sum
         run: |
+          source ../../.venv/bin/activate
           python -c "import pyo3_sum; assert pyo3_sum.sum_of_squares(10) == 385"
           python -c "import pyo3_sum; assert pyo3_sum.sum_of_squares(0) == 0"
           python -c "import pyo3_sum; assert pyo3_sum.sum_of_squares(1) == 1"
@@ -124,13 +130,19 @@ jobs:
         run: |
           pip install maturin matplotlib
 
+      - name: Create virtualenv
+        run: python -m venv .venv
+
       - name: Build pyo3-sum
         working-directory: benchmark/pyo3-sum
-        run: maturin develop --release
+        run: |
+          source ../../.venv/bin/activate
+          maturin develop --release
 
       - name: Run benchmark
         working-directory: benchmark
         run: |
+          source .venv/bin/activate
           python benchmark.py -n 1000000 -i 5 --no-plot
 
       - name: Upload benchmark results
