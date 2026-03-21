@@ -5,79 +5,65 @@ on:
   release:
     types: [published]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (e.g., 0.1.0)'
-        required: true
-        type: string
-      dry_run:
-        description: 'Dry run (do not upload to PyPI)'
-        required: false
-        type: boolean
-        default: true
 
 env:
   CARGO_TERM_COLOR: always
   PACKAGE_DIR: benchmark/pyo3-sum
 
 jobs:
-  # Проверка версии перед публикацией
-  check-version:
-    name: Check Version
+  # Автоматическое увеличение версии
+  bump-version:
+    name: Bump Version
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.get_version.outputs.version }}
-      version_match: ${{ steps.check_match.outputs.match }}
-    
+      new_version: ${{ steps.new_version.outputs.new_version }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Get version from Cargo.toml
-        id: get_version
-        working-directory: ${{ env.PACKAGE_DIR }}
+      - name: Get current version from PyPI
+        id: pypi_version
         run: |
-          VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version from Cargo.toml: $VERSION"
+          CURRENT_VERSION=$(curl -s https://pypi.org/pypi/pyo3-sum/json | jq -r '.info.version // "0.1.0"')
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version on PyPI: $CURRENT_VERSION"
 
-      - name: Get version from pyproject.toml
-        id: get_py_version
-        working-directory: ${{ env.PACKAGE_DIR }}
+      - name: Calculate new version
+        id: new_version
         run: |
-          PY_VERSION=$(grep '^version = ' pyproject.toml | head -1 | cut -d'"' -f2)
-          echo "pyproject_version=$PY_VERSION" >> $GITHUB_OUTPUT
-          echo "Version from pyproject.toml: $PY_VERSION"
+          CURRENT="${{ steps.pypi_version.outputs.current_version }}"
+          MAJOR=$(echo $CURRENT | cut -d. -f1)
+          MINOR=$(echo $CURRENT | cut -d. -f2)
+          PATCH=$(echo $CURRENT | cut -d. -f3)
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
 
-      - name: Check versions match
-        id: check_match
-        working-directory: ${{ env.PACKAGE_DIR }}
+      - name: Update version in Cargo.toml
         run: |
-          CARGO_VER=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
-          PY_VER=$(grep '^version = ' pyproject.toml | head -1 | cut -d'"' -f2)
-          if [ "$CARGO_VER" = "$PY_VER" ]; then
-            echo "match=true" >> $GITHUB_OUTPUT
-            echo "✅ Versions match: $CARGO_VER"
-          else
-            echo "match=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Version mismatch: Cargo.toml=$CARGO_VER, pyproject.toml=$PY_VER"
-            echo "Continuing anyway (versions will be updated during release)"
-          fi
+          sed -i "s/^version = .*/version = \"${{ steps.new_version.outputs.new_version }}\"/" benchmark/pyo3-sum/Cargo.toml
 
-      - name: Check version format (workflow_dispatch)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Update version in pyproject.toml
         run: |
-          if [[ ! "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
-            echo "❌ Invalid version format: ${{ inputs.version }}"
-            exit 1
-          fi
-          echo "✅ Version format is valid: ${{ inputs.version }}"
+          sed -i "s/^version = .*/version = \"${{ steps.new_version.outputs.new_version }}\"/" benchmark/pyo3-sum/pyproject.toml
+
+      - name: Commit and push version bump
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add benchmark/pyo3-sum/Cargo.toml benchmark/pyo3-sum/pyproject.toml
+          git commit -m "Bump version to ${{ steps.new_version.outputs.new_version }} [skip ci]" || echo "No changes to commit"
+          git push
 
   # Сборка wheel для разных платформ
   build-wheels:
-    name: Build Wheels
+    name: Build Wheels (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    needs: [check-version]
+    needs: [bump-version]
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -120,12 +106,12 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: [check-version, build-wheels]
+    needs: [bump-version, build-wheels]
     environment:
       name: pypi
       url: https://pypi.org/p/pyo3-sum
     permissions:
-      id-token: write  # Для OIDC аутентификации на PyPI
+      id-token: write
 
     steps:
       - name: Download all wheels
@@ -138,43 +124,9 @@ jobs:
       - name: List wheels
         run: ls -la dist/
 
-      - name: Publish to PyPI (dry run)
-        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          dry-run: true
-          packages-dir: dist/
-
-      - name: Publish to PyPI (production)
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          skip-existing: true
           verbose: true
-
-      - name: Create GitHub Release Assets
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/*.whl
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Уведомление о публикации
-  notify:
-    name: Notify
-    runs-on: ubuntu-latest
-    needs: [publish-pypi]
-    if: always() && (needs.publish-pypi.result == 'success' || needs.publish-pypi.result == 'failure')
-    
-    steps:
-      - name: Check job status
-        run: |
-          echo "Publish job status: ${{ needs.publish-pypi.result }}"
-          if [ "${{ needs.publish-pypi.result }}" == "success" ]; then
-            echo "✅ Successfully published pyo3-sum to PyPI!"
-            echo "📦 Package: https://pypi.org/p/pyo3-sum"
-          elif [ "${{ needs.publish-pypi.result }}" == "failure" ]; then
-            echo "❌ Failed to publish pyo3-sum to PyPI"
-            exit 1
-          fi
