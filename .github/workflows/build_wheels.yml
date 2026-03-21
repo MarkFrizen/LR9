@@ -19,30 +19,9 @@ env:
 jobs:
   # Linux manylinux сборка
   linux:
-    name: Linux (${{ matrix.platform.target }})
-    runs-on: ${{ matrix.platform.os }}
-    strategy:
-      matrix:
-        platform:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            manylinux: manylinux_2_34
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            manylinux: musllinux_1_2
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            manylinux: manylinux_2_34
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-            manylinux: musllinux_1_2
-          - os: ubuntu-latest
-            target: i686-unknown-linux-gnu
-            manylinux: manylinux_2_34
-          - os: ubuntu-latest
-            target: armv7-unknown-linux-gnueabihf
-            manylinux: manylinux_2_34
-    
+    name: Linux x86_64
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,32 +29,23 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
-          manylinux: ${{ matrix.platform.manylinux }}
+          target: x86_64-unknown-linux-gnu
+          manylinux: manylinux_2_34
           args: --release --out dist
           working-directory: ${{ env.PACKAGE_DIR }}
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-${{ matrix.platform.target }}
+          name: wheels-linux
           path: ${{ env.PACKAGE_DIR }}/dist/*.whl
           retention-days: 7
 
   # Windows сборка
   windows:
-    name: Windows (${{ matrix.platform.target }})
-    runs-on: ${{ matrix.platform.os }}
-    strategy:
-      matrix:
-        platform:
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-          - os: windows-latest
-            target: i686-pc-windows-msvc
-          - os: windows-latest
-            target: aarch64-pc-windows-msvc
-    
+    name: Windows x86_64
+    runs-on: windows-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -83,29 +53,22 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
+          target: x86_64-pc-windows-msvc
           args: --release --out dist
           working-directory: ${{ env.PACKAGE_DIR }}
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-windows-${{ matrix.platform.target }}
+          name: wheels-windows
           path: ${{ env.PACKAGE_DIR }}/dist/*.whl
           retention-days: 7
 
   # macOS сборка
   macos:
-    name: macOS (${{ matrix.platform.target }})
-    runs-on: ${{ matrix.platform.os }}
-    strategy:
-      matrix:
-        platform:
-          - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: macos-latest
-            target: aarch64-apple-darwin
-    
+    name: macOS x86_64
+    runs-on: macos-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -113,36 +76,14 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
+          target: x86_64-apple-darwin
           args: --release --out dist
           working-directory: ${{ env.PACKAGE_DIR }}
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-macos-${{ matrix.platform.target }}
-          path: ${{ env.PACKAGE_DIR }}/dist/*.whl
-          retention-days: 7
-
-  # macOS universal2 (Intel + Apple Silicon)
-  macos-universal:
-    name: macOS Universal2
-    runs-on: macos-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build universal2 wheel
-        uses: PyO3/maturin-action@v1
-        with:
-          args: --release --universal2 --out dist
-          working-directory: ${{ env.PACKAGE_DIR }}
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-macos-universal2
+          name: wheels-macos
           path: ${{ env.PACKAGE_DIR }}/dist/*.whl
           retention-days: 7
 
@@ -150,7 +91,7 @@ jobs:
   merge-and-release:
     name: Merge and Release
     runs-on: ubuntu-latest
-    needs: [linux, windows, macos, macos-universal]
+    needs: [linux, windows, macos]
     if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
     permissions:
       contents: write
